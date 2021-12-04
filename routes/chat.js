@@ -106,7 +106,7 @@ router.get('/messages', async (req, res) => {
             }
         }))
 
-        res.send(simplifiedMessage)
+        res.send(simplifiedMessage.reverse())
     } catch (error) {
         console.log(error);
     }
