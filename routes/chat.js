@@ -54,16 +54,26 @@ router.post('/connect', async (req,res) => {
 router.get('/conversations', async (req,res) => {
     try {
         let myConversations = await Conversation.find({userId: req.user.id})
+
         let conversations = await Promise.all(myConversations.map( async (conversation) => {
-            let twiConversation = await twilio.fetchConversation(conversation.sid)
+            // let twiConversation = await twilio.fetchConversation(conversation.sid)
             let twiParticipants = await twilio.fetchParticipants(conversation.sid)
-            let participants = await Promise.all(twiParticipants.map( async (p) => {
-                return await User.findById(p.identity).select("_id name")
-            }));
+            let participants = await Promise.all( 
+                twiParticipants.filter( (p) => { 
+                    return p.identity !== req.user.id
+                }).map( async (m) => {
+                    return await User.findById(m.identity).select("_id name")
+                })
+            )
+            // let participants = await Promise.all(twiParticipants.map( async (p) => {
+            //     return await User.findById(p.identity).select("_id name")
+            // }));
             return {
-                sid: twiConversation.sid,
-                friendlyName: twiConversation.friendlyName,
-                participants
+                // friendlyName: twiConversation.friendlyName,
+                // participants,
+                // twiConversation,
+                sid: conversation.sid,
+                peer: participants[0]
             }
         }))
 
@@ -87,11 +97,11 @@ router.get('/messages', async (req, res) => {
     try {
         let { sid } = req.query;
         let message = await twilio.readMessages(sid);
-        console.log(message);
         let simplifiedMessage = await Promise.all(message.map( async (m) => {
+            let messageType = (m.author === req.user.id) ? "outgoing" : "incoming";
             return {
                 sid: m.sid,
-                sender: await User.findById(m.author).select("_id name"),
+                type: messageType,
                 body: m.body
             }
         }))
