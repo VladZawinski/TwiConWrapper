@@ -6,10 +6,16 @@ const conversationSchema = new Schema({
         type: String,
         required: true
     },
-    userId: {
+    chatServiceSid: {
         type: String,
         required: true
-    }
+    },
+    participants: [
+        {
+            type: String
+        }
+    ],
+
 })
 
 

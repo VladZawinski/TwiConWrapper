@@ -20,6 +20,16 @@ router.post('/connect', async (req,res) => {
     }
 
     try {
+        // Check whether they are already connected or not
+        let isAlreadyConnected = await Conversation.find({participants: { $all: [ senderId,receiverId ]}});
+        
+        if(isAlreadyConnected){
+            return res.status(300).send({
+                status: 300,
+                message: "Both parties already connected!"
+            })
+        }
+
         // Create conversation
         let conversation = await twilio.createConversation()
         // Add Sender As Participant
@@ -27,18 +37,30 @@ router.post('/connect', async (req,res) => {
         // Add Receiver As Participant
         await twilio.addSingleParticipant(conversation.sid, receiverId)
         // Add conversation with userId attached
-        await Conversation.insertMany([
-            {
-                userId: senderId,
-                sid: conversation.sid
-            },
-            {
-                userId: receiverId,
-                sid: conversation.sid
-            }
-        ]);
+        // await Conversation.insertMany([
+        //     {
+        //         userId: senderId,
+        //         sid: conversation.sid,
+        //         chat_service_sid: conversation.chat_service_sid
+        //     },
+        //     {
+        //         userId: receiverId,
+        //         sid: conversation.sid,
+        //         chat_service_sid: conversation.chat_service_sid
+        //     }
+        // ]);
+        console.log(conversation);
+        await Conversation.create({
+            sid: conversation.sid,
+            chatServiceSid: conversation.chatServiceSid,
+            participants: [
+                senderId,
+                receiverId
+            ]
+        });
 
         res.json({
+            status: 200,
             message: "Message room created",
             conversationId: conversation.sid
         })
@@ -53,12 +75,13 @@ router.post('/connect', async (req,res) => {
 
 router.get('/conversations', async (req,res) => {
     try {
-        let myConversations = await Conversation.find({userId: req.user.id})
+        // let myConversations = await Conversation.find({userId: req.user.id})
+        let myConversations = await Conversation.find({participants: { $all: [req.user.id]}})
 
         let conversations = await Promise.all(myConversations.map( async (conversation) => {
             // let twiConversation = await twilio.fetchConversation(conversation.sid)
             let twiParticipants = await twilio.fetchParticipants(conversation.sid)
-            let participants = await Promise.all( 
+            let participants = await Promise.all(
                 twiParticipants.filter( (p) => { 
                     return p.identity !== req.user.id
                 }).map( async (m) => {
@@ -72,6 +95,7 @@ router.get('/conversations', async (req,res) => {
                 // friendlyName: twiConversation.friendlyName,
                 // participants,
                 // twiConversation,
+                chatServiceSid: conversation.chatServiceSid,
                 sid: conversation.sid,
                 peer: participants[0]
             }
