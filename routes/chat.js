@@ -3,6 +3,18 @@ const router = express.Router();
 const User = require('../models/User');
 const Conversation = require('../models/Conversation')
 const twilio = require('../controller/twilio')
+// Multer
+const multer = require('multer');
+var storage = multer.diskStorage({
+    destination: 'images/',
+    filename: function(req, file, callback) {
+      callback(null, file.originalname);
+    }
+  });
+const upload = multer({ storage: storage})
+// Axios
+const axios = require('axios');
+const path = require('path')
 
 /**
  * Create Conversation
@@ -21,9 +33,9 @@ router.post('/connect', async (req,res) => {
 
     try {
         // Check whether they are already connected or not
-        let isAlreadyConnected = await Conversation.find({participants: { $all: [ senderId,receiverId ]}});
+        let localConversation = await Conversation.find({participants: { $all: [ senderId,receiverId ]}});
         
-        if(isAlreadyConnected){
+        if(localConversation.length !== 0){
             return res.status(300).send({
                 status: 300,
                 message: "Both parties already connected!"
@@ -49,7 +61,6 @@ router.post('/connect', async (req,res) => {
         //         chat_service_sid: conversation.chat_service_sid
         //     }
         // ]);
-        console.log(conversation);
         await Conversation.create({
             sid: conversation.sid,
             chatServiceSid: conversation.chatServiceSid,
@@ -82,7 +93,7 @@ router.get('/conversations', async (req,res) => {
             // let twiConversation = await twilio.fetchConversation(conversation.sid)
             let twiParticipants = await twilio.fetchParticipants(conversation.sid)
             let participants = await Promise.all(
-                twiParticipants.filter( (p) => { 
+                twiParticipants.filter( (p) => {
                     return p.identity !== req.user.id
                 }).map( async (m) => {
                     return await User.findById(m.identity).select("_id name")
@@ -96,7 +107,7 @@ router.get('/conversations', async (req,res) => {
                 // participants,
                 // twiConversation,
                 chatServiceSid: conversation.chatServiceSid,
-                sid: conversation.sid,
+                conversationSid: conversation.sid,
                 peer: participants[0]
             }
         }))
@@ -109,24 +120,58 @@ router.get('/conversations', async (req,res) => {
 
 router.post('/send', async (req, res) => {
     try {
-        let { sid,body } = req.body;
-        let message = await twilio.sendMessage(sid, req.user.id, body);
+        let { conversationSid,body } = req.body;
+        let message = await twilio.sendMessage(conversationSid, req.user.id, body);
         res.send(message);
     } catch (error) {
         console.log(error);
     }
 })
 
+router.post('/sendImage', upload.single('image'), async (req,res) => {
+    let { sid,chatServiceSid } = req.query;
+
+    let actualFilePath = path.join(__dirname, '../' + req.file.path)
+    var config = {
+        method: 'post',
+        url: `https://mcs.us1.twilio.com/v1/Services/${chatServiceSid}/Media`,
+        headers: { 
+          'Content-Type': 'image/png'
+        },
+        data : require("fs").createReadStream(actualFilePath),
+        auth: {
+            username: "ACb0fa555b2da6ba23202f296b525274b3",
+            password: "aa317ae85830ce9bbf11fe32ac30aeca"
+        }
+      };
+
+
+    let request = await axios(config)
+    let message = await twilio.sendImageMessage(sid,req.user.id,request.data.sid)
+
+    res.send(message)
+})
+
+// const host = req.host;
+// const filePath = req.protocol + "://" + host + '/' + req.file.path;
+
 router.get('/messages', async (req, res) => {
     try {
-        let { sid } = req.query;
+        let { chatServiceSid,sid } = req.query;
         let message = await twilio.readMessages(sid);
+        
         let simplifiedMessage = await Promise.all(message.map( async (m) => {
-            let messageType = (m.author === req.user.id) ? "outgoing" : "incoming";
+            let inOut = (m.author === req.user.id) ? "outgoing" : "incoming";
+            
+            let image = (m.media) ? await twilio.readMedia(chatServiceSid,m.media[0].sid) : null
+            let type = (image == null) ? "text" : "image"
+
             return {
                 sid: m.sid,
-                type: messageType,
-                body: m.body
+                inOut,
+                type,
+                body: m.body,
+                image: (image) ? image.links.content_direct_temporary : null
             }
         }))
 

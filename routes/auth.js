@@ -23,7 +23,7 @@ router.post('/register', async (req,res) => {
             name,password: hashedPassword,email
         });
 
-        let token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: 3600 });
+        let token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: 360000 });
 
         return res.json({
             message: 'User created successfully!',
@@ -56,7 +56,7 @@ router.post('/login', async (req,res) => {
             })
         }
 
-        let token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: 3600 });
+        let token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: 360000 });
 
         return res.json({
             message: 'Login success!',
