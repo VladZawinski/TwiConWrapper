@@ -66,7 +66,7 @@ exports.readMessages = (sid) => {
       return new Promise((resolve, reject) => {
             client.conversations.conversations(sid)
                   .messages
-                  .list({limit: 20})
+                  .list({limit: 100})
                   .then(messages => resolve(messages))
                   .catch(e => reject(e))
       })
