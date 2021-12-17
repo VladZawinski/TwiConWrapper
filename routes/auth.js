@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User')
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken")
+const chat = require('../controller/chat')
 
 router.post('/register', async (req,res) => {
     const { name, password, email} = req.body;
@@ -57,10 +58,12 @@ router.post('/login', async (req,res) => {
         }
 
         let token = await jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: 360000 });
+        let chatToken = await chat.generateChatToken(user._id)
 
         return res.json({
             message: 'Login success!',
-            token: token
+            token: token,
+            chatToken
         });
         
     } catch (error) {

@@ -1,7 +1,11 @@
 const twilio = require('twilio');
+const AccessToken = twilio.jwt.AccessToken;
+const ChatGrant = AccessToken.ChatGrant;
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioSecret = process.env.TWILIO_SECRET;
 let client = twilio(accountSid,authToken);
+
 let axios = require('axios')
 
 exports.createConversation = () => {
@@ -94,6 +98,28 @@ exports.readMedia = (chatServiceSid,mediaSid) => {
             } catch (error) {
                   reject(error)
             }
+      })
+}
+
+exports.generateConversationToken = (userId) => {
+      return new Promise(async (resolve,reject) => {
+            client.newKeys.create({ friendlyName: userId })
+                  .then(key => {
+                        const chatGrant = new ChatGrant({
+                              serviceSid: process.env.CHAT_SERVICE_SID
+                        });
+
+                        const token = new AccessToken(
+                              accountSid,
+                              key.sid,
+                              twilioSecret,
+                              { identity: userId }
+                        );
+
+                        token.addGrant(chatGrant);
+                        resolve(token.toJwt());
+                  })
+                  .catch(e => reject(e))
       })
 }
 
