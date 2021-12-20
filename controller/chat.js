@@ -13,11 +13,11 @@ exports.generateChatToken = function TokenGenerator(identity) {
             const token = new AccessToken(
                 process.env.TWILIO_ACCOUNT_SID,
                 process.env.PROGRAMMABLE_CHAT_API_KEY,
-                process.env.PROGRAMMABLE_CHAT_API_SECRET
+                process.env.PROGRAMMABLE_CHAT_API_SECRET,
+                { identity: identity }
             );
     
             token.addGrant(chatGrant);
-            token.identity = identity;
     
             resolve(token.toJwt());
         } catch (error) {
